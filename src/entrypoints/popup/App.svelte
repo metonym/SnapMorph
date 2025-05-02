@@ -1,17 +1,37 @@
 <script lang="ts">
-import svelteLogo from "@/assets/svelte.svg";
-import Counter from "@/lib/Counter.svelte";
+import { onMount } from 'svelte';
+
+let snapshot: SnapshotElement | null = null;
+
+// Fetch the latest snapshot from the background script
+async function fetchSnapshot() {
+  try {
+    const response = await browser.runtime.sendMessage({ type: 'UISNAP_GET_SNAPSHOT' });
+    snapshot = response?.snapshot;
+  } catch (e) {
+    snapshot = null;
+  }
+}
+
+onMount(fetchSnapshot);
+
+// Type for the snapshot tree
+interface SnapshotElement {
+  tag: string;
+  attributes: { name: string; value: string }[];
+  style: Record<string, string>;
+  children: SnapshotElement[];
+  text?: string | null;
+}
 </script>
 
-<main class="flex flex-col items-center justify-center gap-4 p-8">
-  <div class="flex items-center justify-center">
-    <a href="https://wxt.dev" target="_blank" rel="noreferrer">
-      <img src="/wxt.svg" class="w-8 h-8" alt="WXT Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="w-8 h-8" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>WXT + Svelte</h1>
-  <Counter count={10} onmouseenter={() => console.log("mouse entered")} />
+<main class="flex flex-col items-start gap-4 p-4 min-w-[320px]">
+  <h1 class="text-lg font-bold">Selected Element Snapshot</h1>
+  {#if snapshot}
+    <div class="overflow-auto w-full max-h-96 bg-white rounded border p-2 text-xs">
+      <pre>{JSON.stringify(snapshot, null, 2)}</pre>
+    </div>
+  {:else}
+    <div class="text-gray-500">No element selected yet. Use the selector on any page.</div>
+  {/if}
 </main>
