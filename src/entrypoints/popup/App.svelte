@@ -86,7 +86,9 @@ async function startOver() {
 }
 
 // Utility to extract only color styles
-function filterColorStyles(style: Record<string, string>): Record<string, string> {
+function filterColorStyles(
+  style: Record<string, string>,
+): Record<string, string> {
   const colorProps = [
     "color",
     "background-color",
@@ -103,7 +105,7 @@ function filterColorStyles(style: Record<string, string>): Record<string, string
 }
 
 // Recursively optimize the snapshot
-function optimizeSnapshot(node: SnapshotElement): any {
+function optimizeSnapshot(node: SnapshotElement): SnapshotElement {
   return {
     tag: node.tag,
     attributes: node.attributes,
@@ -162,7 +164,7 @@ async function sendSnapshot() {
 }
 </script>
 
-<main class="flex flex-col items-start gap-4 p-4 w-full">
+<main class="flex flex-col items-start gap-4 p-4 w-full max-w-xl mx-auto h-[500px]">
   <h1 class="text-lg font-bold">SnapMorph</h1>
   {#if snapshot}
     <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
@@ -176,7 +178,7 @@ async function sendSnapshot() {
     {/if}
     {#if streamingResult}
       <div class="text-xs text-gray-800 whitespace-pre-wrap mb-2 border rounded bg-gray-50 p-2 max-h-60 overflow-auto">
-        <pre class="whitespace-pre-wrap">{streamingResult}</pre>
+        <pre class="whitespace-pre-wrap">{@html marked(streamingResult)}</pre>
       </div>
     {/if}
     {#if sendResult}

@@ -11,7 +11,7 @@
 
 @layer base {
   body {
-    min-width: 800px;
+    min-width: 620px;
     @apply bg-blue-50 text-blue-600;
   }
 }
