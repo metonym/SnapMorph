@@ -88,10 +88,11 @@ async function sendSnapshot() {
   sendResult = null;
   sendError = null;
   try {
+    const serialized = JSON.stringify(snapshot);
     const res = await fetch("http://localhost:8000/snapshot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ snapshot }),
+      body: JSON.stringify({ snapshot, serialized }),
     });
     if (!res.ok) throw new Error("Failed to send snapshot");
     const data = await res.json();
