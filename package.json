@@ -27,7 +27,6 @@
     "wxt": "^0.20.6"
   },
   "dependencies": {
-    "apify-client": "^2.12.3",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "marked": "^15.0.11",

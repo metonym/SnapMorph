@@ -1,12 +1,7 @@
-import { ApifyClient } from "apify-client";
 import cors from "cors";
 import express from "express";
 import { OpenAI } from "openai";
-import { APIFY_API_KEY, OPENAI_API_KEY, PORT } from "./constants";
-
-const client = new ApifyClient({
-  token: APIFY_API_KEY,
-});
+import { OPENAI_API_KEY, PORT } from "./constants";
 
 const app = express();
 
@@ -15,26 +10,6 @@ app.use(express.json({ limit: "2mb" }));
 
 app.get("/", (req, res) => {
   res.json({ message: "Hello from SnapMorph backend!" });
-});
-
-app.get("/apify", async (req, res) => {
-  const input = {
-    webpageUrl: "https://www.apify.com",
-    proxyConfiguration: {
-      useApifyProxy: false,
-    },
-  };
-
-  const run = await client.actor("lpEmfhnyGrnbZt4xO").call(input);
-
-  // Fetch and print Actor results from the run's dataset (if any)
-  console.log("Results from dataset");
-  const { items } = await client.dataset(run.defaultDatasetId).listItems();
-  for (const item of items) {
-    console.dir(item);
-  }
-
-  return res.json({ message: "Apify results fetched" });
 });
 
 app.post("/snapshot", async (req, res) => {
