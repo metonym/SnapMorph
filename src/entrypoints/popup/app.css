@@ -11,7 +11,7 @@
 
 @layer base {
   body {
-    min-width: 320px;
+    min-width: 800px;
     @apply bg-avocado-200 text-avocado-600;
   }
 }
