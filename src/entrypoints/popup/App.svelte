@@ -1,170 +1,175 @@
 <script lang="ts">
-  import { marked } from "marked";
-  import { onMount } from "svelte";
+import { marked } from "marked";
+import { onMount } from "svelte";
 
-  let snapshot: SnapshotElement | null = null;
-  let backendMessage: string | null = null;
-  let backendLoading = true;
-  let backendError: string | null = null;
+let snapshot: SnapshotElement | null = null;
+let backendMessage: string | null = null;
+let backendLoading = true;
+let backendError: string | null = null;
 
-  let sending = false;
-  let sendResult: string | null = null;
-  let sendError: string | null = null;
+let sending = false;
+let sendResult: string | null = null;
+let sendError: string | null = null;
 
-  let streamingResult = "";
-  let streaming = false;
+let streamingResult = "";
+let streaming = false;
 
-  // Type for the snapshot tree
-  interface SnapshotElement {
-    tag: string;
-    attributes: { name: string; value: string }[];
-    style: Record<string, string>;
-    children: SnapshotElement[];
-    text?: string | null;
-  }
+// Type for the snapshot tree
+interface SnapshotElement {
+  tag: string;
+  attributes: { name: string; value: string }[];
+  style: Record<string, string>;
+  children: SnapshotElement[];
+  text?: string | null;
+}
 
-  // Fetch the latest snapshot from the background script
-  async function fetchSnapshot() {
-    try {
-      const response = await browser.runtime.sendMessage({
-        type: "UISNAP_GET_SNAPSHOT",
-      });
-      snapshot = response?.snapshot;
-    } catch (e) {
-      snapshot = null;
-    }
-  }
-
-  async function fetchBackendMessage() {
-    backendLoading = true;
-    backendError = null;
-    backendMessage = null;
-    try {
-      const res = await fetch("http://localhost:8000/");
-      if (!res.ok) throw new Error("Failed to fetch backend");
-      const data = await res.json();
-      backendMessage = data.message;
-    } catch (e) {
-      backendError = "Could not connect to backend.";
-    } finally {
-      backendLoading = false;
-    }
-  }
-
-  onMount(() => {
-    fetchSnapshot();
-    fetchBackendMessage();
-  });
-
-  function styleToString(style: Record<string, string>): string {
-    return Object.entries(style)
-      .map(([k, v]) => `${k}:${v}`)
-      .join(";");
-  }
-
-  // Recursively render the snapshot as HTML
-  function renderSnapshot(node: SnapshotElement): string {
-    if (!node) return "";
-    const attrs = node.attributes
-      .map((attr) => `${attr.name}="${attr.value.replace(/"/g, "&quot;")}"`)
-      .join(" ");
-    const style = styleToString(node.style);
-    const open = `<${node.tag}${attrs ? ` ${attrs}` : ""}${style ? ` style="${style}"` : ""}>`;
-    const close = `</${node.tag}>`;
-    const children = node.children?.map(renderSnapshot).join("") || "";
-    const text = node.text ? node.text : "";
-    return `${open}${text}${children}${close}`;
-  }
-
-  // Start over: clear snapshot and re-enable selection
-  async function startOver() {
-    snapshot = null;
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
+// Fetch the latest snapshot from the background script
+async function fetchSnapshot() {
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: "UISNAP_GET_SNAPSHOT",
     });
-    if (tab?.id) {
-      await browser.tabs.sendMessage(tab.id, { type: "UISNAP_START_OVER" });
-    }
+    snapshot = response?.snapshot;
+  } catch (e) {
+    snapshot = null;
   }
+}
 
-  // Utility to extract only color styles
-  function filterColorStyles(
-    style: Record<string, string>
-  ): Record<string, string> {
-    const colorProps = [
-      "color",
-      "background-color",
-      "border-color",
-      "outline-color",
-      "text-decoration-color",
-      // Add more color-related CSS properties as needed
-    ];
-    const filtered: Record<string, string> = {};
-    for (const key of colorProps) {
-      if (style[key]) filtered[key] = style[key];
-    }
-    return filtered;
+async function fetchBackendMessage() {
+  backendLoading = true;
+  backendError = null;
+  backendMessage = null;
+  try {
+    const res = await fetch("http://localhost:8000/");
+    if (!res.ok) throw new Error("Failed to fetch backend");
+    const data = await res.json();
+    backendMessage = data.message;
+  } catch (e) {
+    backendError = "Could not connect to backend.";
+  } finally {
+    backendLoading = false;
   }
+}
 
-  // Recursively optimize the snapshot
-  function optimizeSnapshot(node: SnapshotElement): SnapshotElement {
-    return {
-      tag: node.tag,
-      attributes: node.attributes,
-      style: filterColorStyles(node.style),
-      children: node.children?.map(optimizeSnapshot) || [],
-      text: node.text ?? null,
-    };
+onMount(() => {
+  fetchSnapshot();
+  fetchBackendMessage();
+});
+
+function styleToString(style: Record<string, string>): string {
+  return Object.entries(style)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(";");
+}
+
+// Recursively render the snapshot as HTML
+function renderSnapshot(node: SnapshotElement): string {
+  if (!node) return "";
+  const attrs = node.attributes
+    .map((attr) => `${attr.name}="${attr.value.replace(/"/g, "&quot;")}"`)
+    .join(" ");
+  const style = styleToString(node.style);
+  const open = `<${node.tag}${attrs ? ` ${attrs}` : ""}${style ? ` style="${style}"` : ""}>`;
+  const close = `</${node.tag}>`;
+  const children = node.children?.map(renderSnapshot).join("") || "";
+  const text = node.text ? node.text : "";
+  return `${open}${text}${children}${close}`;
+}
+
+// Start over: clear snapshot and re-enable selection
+async function startOver() {
+  snapshot = null;
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  if (tab?.id) {
+    await browser.tabs.sendMessage(tab.id, { type: "UISNAP_START_OVER" });
   }
+}
 
-  // Send snapshot to backend
-  async function sendSnapshot() {
-    if (!snapshot) return;
-    sending = true;
-    streaming = true;
-    streamingResult = "";
-    sendResult = null;
-    sendError = null;
-    try {
-      const serialized = JSON.stringify(snapshot);
-      const optimized = JSON.stringify(optimizeSnapshot(snapshot));
-      const res = await fetch("http://localhost:8000/snapshot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snapshot, serialized, optimized }),
-      });
-      if (!res.body) throw new Error("No response body");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          // Parse SSE data lines
-          const blocks = chunk.split(/\n\n/);
-          for (const block of blocks) {
-            if (block.startsWith("data: ")) {
-              const data = block.slice(6);
-              if (data === "[DONE]") {
-                done = true;
-              } else {
-                streamingResult += data;
-              }
+// Utility to extract only color styles
+function filterColorStyles(
+  style: Record<string, string>,
+): Record<string, string> {
+  const colorProps = [
+    "color",
+    "background-color",
+    "border-color",
+    "outline-color",
+    "text-decoration-color",
+    // Add more color-related CSS properties as needed
+  ];
+  const filtered: Record<string, string> = {};
+  for (const key of colorProps) {
+    if (style[key]) filtered[key] = style[key];
+  }
+  return filtered;
+}
+
+// Recursively optimize the snapshot
+function optimizeSnapshot(node: SnapshotElement): SnapshotElement {
+  return {
+    tag: node.tag,
+    attributes: node.attributes,
+    style: filterColorStyles(node.style),
+    children: node.children?.map(optimizeSnapshot) || [],
+    text: node.text ?? null,
+  };
+}
+
+// Send snapshot to backend
+async function sendSnapshot() {
+  if (!snapshot) return;
+  sending = true;
+  streaming = true;
+  streamingResult = "";
+  sendResult = null;
+  sendError = null;
+  try {
+    const serialized = JSON.stringify(snapshot);
+    const optimized = JSON.stringify(optimizeSnapshot(snapshot));
+    const res = await fetch("http://localhost:8000/snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snapshot, serialized, optimized }),
+    });
+    if (!res.body) throw new Error("No response body");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true });
+        // Parse SSE data lines
+        const blocks = chunk.split(/\n\n/);
+        for (const block of blocks) {
+          if (block.startsWith("data: ")) {
+            const data = block.slice(6);
+            if (data === "[DONE]") {
+              done = true;
+            } else {
+              streamingResult += data;
             }
           }
         }
-        done = done || doneReading;
       }
-      sendResult = "LLM response complete.";
-    } catch (e) {
-      sendError = "Failed to send snapshot.";
-    } finally {
-      sending = false;
-      streaming = false;
+      done = done || doneReading;
     }
+    sendResult = "Analysis complete.";
+  } catch (e) {
+    sendError = "Failed to send snapshot.";
+  } finally {
+    sending = false;
+    streaming = false;
   }
+}
+
+// Automatically send snapshot when it is set
+$: if (snapshot) {
+  sendSnapshot();
+}
 </script>
 
 <header class="flex flex-col gap-4 p-4 pb-0 w-full">
@@ -175,13 +180,6 @@
       on:click={startOver}
     >
       New selection
-    </button>
-    <button
-      class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end"
-      on:click={sendSnapshot}
-      disabled={sending}
-    >
-      {sending ? "Analyzing..." : "Analyze"}
     </button>
   </div>
 </header>
@@ -226,6 +224,7 @@
     </div>
     {#if streamingResult}
       <div
+      id="result"
         class="text-xs text-blue-900 whitespace-pre-wrap mb-2 border border-blue-600 rounded bg-blue-50 p-2 max-h-[80vh] overflow-auto"
       >
         {@html marked(streamingResult)}
@@ -233,3 +232,9 @@
     {/if}
   </div>
 </main>
+
+<style>
+  :global(#result > ol) {
+    display: flex;
+  }
+</style>
