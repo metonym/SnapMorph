@@ -6,6 +6,10 @@ let backendMessage: string | null = null;
 let backendLoading = true;
 let backendError: string | null = null;
 
+let sending = false;
+let sendResult: string | null = null;
+let sendError: string | null = null;
+
 // Type for the snapshot tree
 interface SnapshotElement {
   tag: string;
@@ -76,6 +80,28 @@ async function startOver() {
     await browser.tabs.sendMessage(tab.id, { type: "UISNAP_START_OVER" });
   }
 }
+
+// Send snapshot to backend
+async function sendSnapshot() {
+  if (!snapshot) return;
+  sending = true;
+  sendResult = null;
+  sendError = null;
+  try {
+    const res = await fetch("http://localhost:8000/snapshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snapshot }),
+    });
+    if (!res.ok) throw new Error("Failed to send snapshot");
+    const data = await res.json();
+    sendResult = data.message || "Snapshot sent successfully!";
+  } catch (e) {
+    sendError = "Failed to send snapshot.";
+  } finally {
+    sending = false;
+  }
+}
 </script>
 
 <main class="flex flex-col items-start gap-4 p-4 min-w-[320px]">
@@ -93,6 +119,15 @@ async function startOver() {
     <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
       Start Over
     </button>
+    <button class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end" on:click={sendSnapshot} disabled={sending}>
+      {sending ? 'Sending...' : 'Send Snapshot to Backend'}
+    </button>
+    {#if sendResult}
+      <div class="text-xs text-green-700 mb-2">{sendResult}</div>
+    {/if}
+    {#if sendError}
+      <div class="text-xs text-red-600 mb-2">{sendError}</div>
+    {/if}
     <div class="mb-4 w-full border rounded bg-white p-2">
       <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
       <div
