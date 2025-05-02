@@ -105,23 +105,14 @@ async function sendSnapshot() {
 }
 </script>
 
-<main class="flex flex-col items-start gap-4 p-4 min-w-[320px]">
+<main class="flex flex-col items-start gap-4 p-4 w-full">
   <h1 class="text-lg font-bold">SnapMorph</h1>
-  <div class="mb-2 w-full">
-    {#if backendLoading}
-      <span class="text-xs text-gray-500">Connecting to backend...</span>
-    {:else if backendError}
-      <span class="text-xs text-red-600">{backendError}</span>
-    {:else if backendMessage}
-      <span class="text-xs text-green-700">{backendMessage}</span>
-    {/if}
-  </div>
   {#if snapshot}
     <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
       Start Over
     </button>
     <button class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end" on:click={sendSnapshot} disabled={sending}>
-      {sending ? 'Sending...' : 'Send Snapshot to Backend'}
+      Analyze
     </button>
     {#if sendResult}
       <div class="text-xs text-green-700 mb-2">{sendResult}</div>
@@ -133,12 +124,12 @@ async function sendSnapshot() {
       <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
       <div
         class="border bg-gray-50 p-2 overflow-auto"
-        style="max-height:500px; max-width:100%; width:fit-content; height:fit-content; display:block;"
+        style="min-height:90px; max-height:800px; max-width:100%; width:fit-content; height:fit-content; display:block;"
       >
         {@html renderSnapshot(snapshot)}
       </div>
     </div>
-    <div class="overflow-auto w-full max-h-96 bg-white rounded border p-2 text-xs">
+    <div class="overflow-auto w-full max-h-72 bg-white rounded border p-2 text-xs">
       <pre>{JSON.stringify(snapshot, null, 2)}</pre>
     </div>
   {:else}

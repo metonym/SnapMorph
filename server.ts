@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Readable } from "node:stream";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import cors from "cors";
-import express, { Request, Response } from "express";
+import express from "express";
+import { z } from "zod";
+import { RIME_API_KEY } from "./constants";
 
 const app = express();
 const PORT = 8000;
@@ -30,82 +37,95 @@ app.post("/snapshot", (req, res) => {
   const snapshotStr = JSON.stringify(snapshot);
   console.log("[SnapMorph] Received snapshot:", snapshotStr.slice(0, 100));
   console.log("[SnapMorph] Received serialized:", serialized);
+
   res.json({ message: "Snapshot received", snapshot });
 });
 
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+// Proxy endpoint to stream MP3 from Rime TTS API
+app.post("/tts", async (req, res) => {
+  const {
+    speaker,
+    text,
+    modelId = "arcana",
+    repetition_penalty = 1.5,
+    temperature = 0.5,
+    top_p = 0.5,
+    max_tokens = 1200,
+  } = req.body;
 
-// Handle POST requests for client-to-server communication
-app.post("/mcp", async (req, res) => {
-  // Check for existing session ID
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  let transport: StreamableHTTPServerTransport;
-
-  if (sessionId && transports[sessionId]) {
-    // Reuse existing transport
-    transport = transports[sessionId];
-  } else if (!sessionId && isInitializeRequest(req.body)) {
-    // New initialization request
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        // Store the transport by session ID
-        transports[sessionId] = transport;
-      },
-    });
-
-    // Clean up transport when closed
-    transport.onclose = () => {
-      if (transport.sessionId) {
-        delete transports[transport.sessionId];
-      }
-    };
-    const server = new McpServer({
-      name: "example-server",
-      version: "1.0.0",
-    });
-
-    // ... set up server resources, tools, and prompts ...
-    console.log("[SnapMorph] Connected to MCP server");
-    // Connect to the MCP server
-    await server.connect(transport);
-  } else {
-    // Invalid request
-    res.status(400).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Bad Request: No valid session ID provided",
-      },
-      id: null,
-    });
+  if (!speaker || !text || !RIME_API_KEY) {
+    res
+      .status(400)
+      .json({
+        error:
+          "Missing required fields: speaker, text, or RIME_API_KEY constant",
+      });
     return;
   }
 
-  // Handle the request
-  await transport.handleRequest(req, res, req.body);
+  try {
+    const rimeRes = await fetch("https://users.rime.ai/v1/rime-tts", {
+      method: "POST",
+      headers: {
+        Accept: "audio/mp3",
+        Authorization: RIME_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        speaker,
+        text,
+        modelId,
+        repetition_penalty,
+        temperature,
+        top_p,
+        max_tokens,
+      }),
+    });
+
+    if (!rimeRes.ok || !rimeRes.body) {
+      res.status(500).json({ error: "Failed to fetch TTS audio" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "audio/mp3");
+    if (rimeRes.body) {
+      // @ts-expect-error: Node.js and Web Streams API type mismatch, safe to ignore for this use
+      const nodeStream = Readable.fromWeb(rimeRes.body);
+      nodeStream.pipe(res);
+    }
+  } catch (err) {
+    res.status(500).json({ error: "TTS proxy error", details: String(err) });
+  }
 });
 
-// Reusable handler for GET and DELETE requests
-const handleSessionRequest = async (
-  req: express.Request,
-  res: express.Response,
-) => {
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  if (!sessionId || !transports[sessionId]) {
-    res.status(400).send("Invalid or missing session ID");
-    return;
-  }
+// Create an MCP server
+const server = new McpServer({
+  name: "Demo",
+  version: "1.0.0",
+});
 
-  const transport = transports[sessionId];
-  await transport.handleRequest(req, res);
-};
+// Add an addition tool
+server.tool("add", { a: z.number(), b: z.number() }, async ({ a, b }) => ({
+  content: [{ type: "text", text: String(a + b) }],
+}));
 
-// Handle GET requests for server-to-client notifications via SSE
-app.get("/mcp", handleSessionRequest);
+// Add a dynamic greeting resource
+server.resource(
+  "greeting",
+  new ResourceTemplate("greeting://{name}", { list: undefined }),
+  async (uri, { name }) => ({
+    contents: [
+      {
+        uri: uri.href,
+        text: `Hello, ${name}!`,
+      },
+    ],
+  }),
+);
 
-// Handle DELETE requests for session termination
-app.delete("/mcp", handleSessionRequest);
+// Start receiving messages on stdin and sending messages on stdout
+const transport = new StdioServerTransport();
+await server.connect(transport);
 
 app.listen(PORT, () => {
   console.log(`SnapMorph backend listening at http://localhost:${PORT}`);
