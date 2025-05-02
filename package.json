@@ -12,8 +12,8 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "postinstall": "wxt prepare",
-    "format": "bunx biome check --write ."
+    "format": "bunx biome check --write .",
+    "postinstall": "wxt prepare"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "openai": "^4.97.0"
   }
 }

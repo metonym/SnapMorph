@@ -131,11 +131,18 @@ export default defineContentScript({
       console.log("[UISNAP] Event listeners attached");
     }
 
-    // Listen for messages from the popup to start over
+    // Listen for messages from the popup to start over or double text
     browser.runtime.onMessage.addListener((message) => {
       if (message?.type === "UISNAP_START_OVER") {
         console.log("[UISNAP] Received UISNAP_START_OVER message");
         enableSelection();
+      }
+      if (message?.type === "UISNAP_DOUBLE_TEXT") {
+        if (selecting && lastHovered) {
+          // Double the text content of the selected element
+          lastHovered.textContent =
+            lastHovered.textContent + lastHovered.textContent;
+        }
       }
     });
 
