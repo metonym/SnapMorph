@@ -10,6 +10,9 @@ let sending = false;
 let sendResult: string | null = null;
 let sendError: string | null = null;
 
+let streamingResult = "";
+let streaming = false;
+
 // Type for the snapshot tree
 interface SnapshotElement {
   tag: string;
@@ -85,6 +88,8 @@ async function startOver() {
 async function sendSnapshot() {
   if (!snapshot) return;
   sending = true;
+  streaming = true;
+  streamingResult = "";
   sendResult = null;
   sendError = null;
   try {
@@ -94,13 +99,35 @@ async function sendSnapshot() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ snapshot, serialized }),
     });
-    if (!res.ok) throw new Error("Failed to send snapshot");
-    const data = await res.json();
-    sendResult = data.message || "Snapshot sent successfully!";
+    if (!res.body) throw new Error("No response body");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    while (!done) {
+      const { value, done: doneReading } = await reader.read();
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true });
+        // Parse SSE data lines
+        const blocks = chunk.split(/\n\n/);
+        for (const block of blocks) {
+          if (block.startsWith("data: ")) {
+            const data = block.slice(6);
+            if (data === "[DONE]") {
+              done = true;
+            } else {
+              streamingResult += data;
+            }
+          }
+        }
+      }
+      done = done || doneReading;
+    }
+    sendResult = "LLM response complete.";
   } catch (e) {
     sendError = "Failed to send snapshot.";
   } finally {
     sending = false;
+    streaming = false;
   }
 }
 </script>
@@ -112,8 +139,16 @@ async function sendSnapshot() {
       Start Over
     </button>
     <button class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end" on:click={sendSnapshot} disabled={sending}>
-      Analyze
+      {sending ? 'Analyzing...' : 'Analyze'}
     </button>
+    {#if streaming}
+      <div class="text-xs text-blue-700 mb-2">Analyzing and streaming response...</div>
+    {/if}
+    {#if streamingResult}
+      <div class="text-xs text-gray-800 whitespace-pre-wrap mb-2 border rounded bg-gray-50 p-2 max-h-60 overflow-auto">
+        {streamingResult}
+      </div>
+    {/if}
     {#if sendResult}
       <div class="text-xs text-green-700 mb-2">{sendResult}</div>
     {/if}

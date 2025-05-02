@@ -25,21 +25,31 @@ app.post("/snapshot", async (req, res) => {
   }
 
   const snapshotStr = JSON.stringify(snapshot);
-  console.log("[SnapMorph] Received snapshot:", snapshotStr.slice(0, 100));
-  console.log("[SnapMorph] Received serialized:", serialized);
+  console.log("[SnapMorph] Received snapshot:", snapshotStr.slice(0, 10));
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
 
   const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-  const completion = await openai.chat.completions.create({
+  const stream = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a helpful assistant." },
-      { role: "user", content: "Say hello world" },
+      { role: "system", content: "You are an accessibility and content expert." },
+      { role: "user", content: `Analyze the following serialized DOM snapshot (it contains markup, styles, and text). Provide recommendations to optimize the accessibility.\n\nSerialized DOM:\n${serialized}` },
     ],
+    stream: true,
   });
-  const result = completion.choices[0]?.message?.content || "No response";
-  console.log("[OpenAI] Response:", result);
 
-  res.json({ message: "Snapshot received", snapshot });
+  for await (const chunk of stream) {
+    const content = chunk.choices?.[0]?.delta?.content;
+    if (content) {
+      res.write(`data: ${content}\n\n`);
+    }
+  }
+  res.write("data: [DONE]\n\n");
+  res.end();
 });
 
 app.listen(PORT, () => {
