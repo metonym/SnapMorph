@@ -95,7 +95,10 @@ async function startOver() {
     </button>
     <div class="mb-4 w-full border rounded bg-white p-2">
       <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
-      <div class="border bg-gray-50 p-2 overflow-auto" style="min-height:40px;max-height:200px;">
+      <div
+        class="border bg-gray-50 p-2 overflow-auto"
+        style="max-height:500px; max-width:100%; width:fit-content; height:fit-content; display:block;"
+      >
         {@html renderSnapshot(snapshot)}
       </div>
     </div>
