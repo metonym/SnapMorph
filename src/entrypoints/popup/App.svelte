@@ -1,4 +1,5 @@
 <script lang="ts">
+import { marked } from "marked";
 import { onMount } from "svelte";
 
 let snapshot: SnapshotElement | null = null;
@@ -84,6 +85,34 @@ async function startOver() {
   }
 }
 
+// Utility to extract only color styles
+function filterColorStyles(style: Record<string, string>): Record<string, string> {
+  const colorProps = [
+    "color",
+    "background-color",
+    "border-color",
+    "outline-color",
+    "text-decoration-color",
+    // Add more color-related CSS properties as needed
+  ];
+  const filtered: Record<string, string> = {};
+  for (const key of colorProps) {
+    if (style[key]) filtered[key] = style[key];
+  }
+  return filtered;
+}
+
+// Recursively optimize the snapshot
+function optimizeSnapshot(node: SnapshotElement): any {
+  return {
+    tag: node.tag,
+    attributes: node.attributes,
+    style: filterColorStyles(node.style),
+    children: node.children?.map(optimizeSnapshot) || [],
+    text: node.text ?? null,
+  };
+}
+
 // Send snapshot to backend
 async function sendSnapshot() {
   if (!snapshot) return;
@@ -94,10 +123,11 @@ async function sendSnapshot() {
   sendError = null;
   try {
     const serialized = JSON.stringify(snapshot);
+    const optimized = JSON.stringify(optimizeSnapshot(snapshot));
     const res = await fetch("http://localhost:8000/snapshot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ snapshot, serialized }),
+      body: JSON.stringify({ snapshot, serialized, optimized }),
     });
     if (!res.body) throw new Error("No response body");
     const reader = res.body.getReader();
@@ -146,7 +176,7 @@ async function sendSnapshot() {
     {/if}
     {#if streamingResult}
       <div class="text-xs text-gray-800 whitespace-pre-wrap mb-2 border rounded bg-gray-50 p-2 max-h-60 overflow-auto">
-        {streamingResult}
+        <pre class="whitespace-pre-wrap">{streamingResult}</pre>
       </div>
     {/if}
     {#if sendResult}

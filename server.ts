@@ -13,7 +13,7 @@ app.get("/", (req, res) => {
 });
 
 app.post("/snapshot", async (req, res) => {
-  const { snapshot, serialized } = req.body;
+  const { snapshot, serialized, optimized } = req.body;
   if (!snapshot) {
     res.status(400).json({ error: "Missing snapshot in request body" });
     return;
@@ -37,7 +37,7 @@ app.post("/snapshot", async (req, res) => {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: "You are an accessibility and content expert." },
-      { role: "user", content: `Analyze the following serialized DOM snapshot (it contains markup, styles, and text). Provide recommendations to optimize the accessibility.\n\nSerialized DOM:\n${serialized}` },
+      { role: "user", content: `Analyze the following serialized DOM snapshot (it contains markup, styles, and text). Provide recommendations to optimize the accessibility.\n\nSerialized DOM:\n${optimized}` },
     ],
     stream: true,
   });
