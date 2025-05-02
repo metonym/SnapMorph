@@ -89,8 +89,21 @@ export default defineContentScript({
       };
     }
 
-    document.addEventListener('mouseover', handleMouseOver, true);
-    document.addEventListener('mouseout', handleMouseOut, true);
-    document.addEventListener('click', handleClick, true);
+    function enableSelection() {
+      selecting = false;
+      document.addEventListener('mouseover', handleMouseOver, true);
+      document.addEventListener('mouseout', handleMouseOut, true);
+      document.addEventListener('click', handleClick, true);
+    }
+
+    // Listen for messages from the popup to start over
+    browser.runtime.onMessage.addListener((message) => {
+      if (message?.type === 'UISNAP_START_OVER') {
+        enableSelection();
+      }
+    });
+
+    // Initial enable
+    enableSelection();
   },
 });

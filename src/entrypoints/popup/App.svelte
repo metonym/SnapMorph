@@ -43,11 +43,24 @@ function renderSnapshot(node: SnapshotElement): string {
   const text = node.text ? node.text : '';
   return `${open}${text}${children}${close}`;
 }
+
+// Start over: clear snapshot and re-enable selection
+async function startOver() {
+  snapshot = null;
+  // Send a message to the content script to re-enable selection
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id) {
+    await browser.tabs.sendMessage(tab.id, { type: 'UISNAP_START_OVER' });
+  }
+}
 </script>
 
 <main class="flex flex-col items-start gap-4 p-4 min-w-[320px]">
-  <h1 class="text-lg font-bold">Selected Element Snapshot</h1>
+  <h1 class="text-lg font-bold">SnapMorph</h1>
   {#if snapshot}
+    <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
+      Start Over
+    </button>
     <div class="mb-4 w-full border rounded bg-white p-2">
       <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
       <div class="border bg-gray-50 p-2 overflow-auto" style="min-height:40px;max-height:200px;">
