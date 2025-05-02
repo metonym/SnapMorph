@@ -1,7 +1,10 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount } from "svelte";
 
 let snapshot: SnapshotElement | null = null;
+let backendMessage: string | null = null;
+let backendLoading = true;
+let backendError: string | null = null;
 
 // Type for the snapshot tree
 interface SnapshotElement {
@@ -15,48 +18,77 @@ interface SnapshotElement {
 // Fetch the latest snapshot from the background script
 async function fetchSnapshot() {
   try {
-    const response = await browser.runtime.sendMessage({ type: 'UISNAP_GET_SNAPSHOT' });
+    const response = await browser.runtime.sendMessage({
+      type: "UISNAP_GET_SNAPSHOT",
+    });
     snapshot = response?.snapshot;
   } catch (e) {
     snapshot = null;
   }
 }
 
-onMount(fetchSnapshot);
+async function fetchBackendMessage() {
+  backendLoading = true;
+  backendError = null;
+  backendMessage = null;
+  try {
+    const res = await fetch("http://localhost:8000/");
+    if (!res.ok) throw new Error("Failed to fetch backend");
+    const data = await res.json();
+    backendMessage = data.message;
+  } catch (e) {
+    backendError = "Could not connect to backend.";
+  } finally {
+    backendLoading = false;
+  }
+}
+
+onMount(() => {
+  fetchSnapshot();
+  fetchBackendMessage();
+});
 
 function styleToString(style: Record<string, string>): string {
   return Object.entries(style)
     .map(([k, v]) => `${k}:${v}`)
-    .join(';');
+    .join(";");
 }
 
 // Recursively render the snapshot as HTML
 function renderSnapshot(node: SnapshotElement): string {
-  if (!node) return '';
+  if (!node) return "";
   const attrs = node.attributes
-    .map(attr => `${attr.name}="${attr.value.replace(/"/g, '&quot;')}"`)
-    .join(' ');
+    .map((attr) => `${attr.name}="${attr.value.replace(/"/g, "&quot;")}"`)
+    .join(" ");
   const style = styleToString(node.style);
-  const open = `<${node.tag}${attrs ? ` ${attrs}` : ''}${style ? ` style="${style}"` : ''}>`;
+  const open = `<${node.tag}${attrs ? ` ${attrs}` : ""}${style ? ` style="${style}"` : ""}>`;
   const close = `</${node.tag}>`;
-  const children = node.children?.map(renderSnapshot).join('') || '';
-  const text = node.text ? node.text : '';
+  const children = node.children?.map(renderSnapshot).join("") || "";
+  const text = node.text ? node.text : "";
   return `${open}${text}${children}${close}`;
 }
 
 // Start over: clear snapshot and re-enable selection
 async function startOver() {
   snapshot = null;
-  // Send a message to the content script to re-enable selection
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (tab?.id) {
-    await browser.tabs.sendMessage(tab.id, { type: 'UISNAP_START_OVER' });
+    await browser.tabs.sendMessage(tab.id, { type: "UISNAP_START_OVER" });
   }
 }
 </script>
 
 <main class="flex flex-col items-start gap-4 p-4 min-w-[320px]">
   <h1 class="text-lg font-bold">SnapMorph</h1>
+  <div class="mb-2 w-full">
+    {#if backendLoading}
+      <span class="text-xs text-gray-500">Connecting to backend...</span>
+    {:else if backendError}
+      <span class="text-xs text-red-600">{backendError}</span>
+    {:else if backendMessage}
+      <span class="text-xs text-green-700">{backendMessage}</span>
+    {/if}
+  </div>
   {#if snapshot}
     <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
       Start Over
