@@ -4,7 +4,6 @@ import express from "express";
 import { OpenAI } from "openai";
 import { APIFY_API_KEY, OPENAI_API_KEY, PORT } from "./constants";
 
-console.log("[SnapMorph] APIFY_API_KEY:", APIFY_API_KEY?.slice(0, 10));
 const client = new ApifyClient({
   token: APIFY_API_KEY,
 });
@@ -64,11 +63,11 @@ app.post("/snapshot", async (req, res) => {
     messages: [
       {
         role: "system",
-        content: "You are an accessibility and content expert.",
+        content: "You are a UI design, accessibility, and content expert.",
       },
       {
         role: "user",
-        content: `Analyze the following serialized DOM snapshot (it contains markup, styles, and text). Provide recommendations to optimize the accessibility.\n\nSerialized DOM:\n${optimized}`,
+        content: `Analyze the following serialized DOM snapshot (it contains markup, styles, and text). Provide recommendations to optimize the accessibility.\n\nFormatting guidelines:\n- Ensure line breaks are provided in the generated markdown.\n- Make the response very direct, concise, and a maximum of 320 characters.\n\nSerialized DOM:\n${optimized}`,
       },
     ],
     stream: true,
