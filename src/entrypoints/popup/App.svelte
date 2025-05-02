@@ -79,7 +79,10 @@ function renderSnapshot(node: SnapshotElement): string {
 // Start over: clear snapshot and re-enable selection
 async function startOver() {
   snapshot = null;
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
   if (tab?.id) {
     await browser.tabs.sendMessage(tab.id, { type: "UISNAP_START_OVER" });
   }
@@ -164,42 +167,73 @@ async function sendSnapshot() {
 }
 </script>
 
-<main class="flex flex-col items-start gap-4 p-4 w-full max-w-xl mx-auto h-[500px]">
-  <h1 class="text-lg font-bold">SnapMorph</h1>
-  {#if snapshot}
-    <button class="mb-2 px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 self-end" on:click={startOver}>
-      Start Over
+<header class="flex flex-col gap-4 p-4 pb-0 w-full">
+<h1 class="text-lg font-bold">SnapMorph</h1>
+  <div class="flex flex-row gap-2">
+    <button
+      class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end"
+      on:click={startOver}
+    >
+      New selection
     </button>
-    <button class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end" on:click={sendSnapshot} disabled={sending}>
-      {sending ? 'Analyzing...' : 'Analyze'}
+    <button
+      class="mb-2 px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 self-end"
+      on:click={sendSnapshot}
+      disabled={sending}
+    >
+      {sending ? "Analyzing..." : "Analyze"}
     </button>
-    {#if streaming}
-      <div class="text-xs text-blue-700 mb-2">Analyzing and streaming response...</div>
-    {/if}
-    {#if streamingResult}
-      <div class="text-xs text-gray-800 whitespace-pre-wrap mb-2 border rounded bg-gray-50 p-2 max-h-60 overflow-auto">
-        <pre class="whitespace-pre-wrap">{@html marked(streamingResult)}</pre>
+  </div>
+</header>
+<main class="flex flex-row gap-4 p-4 pb-0 mb-4 w-full">
+  
+  <!-- Left column: Preview and JSON -->
+  <div class="flex flex-col flex-1 w-1/2">
+   
+    <div>
+      {#if streaming}
+        <div class="text-xs text-blue-700 mb-2">
+          Analyzing and streaming response...
+        </div>
+      {/if}
+      {#if sendResult}
+        <div class="text-xs text-green-700 mb-2">{sendResult}</div>
+      {/if}
+      {#if sendError}
+        <div class="text-xs text-red-600 mb-2">{sendError}</div>
+      {/if}
+    </div>
+    {#if snapshot}
+     
+
+      <div class="mb-4 w-full border rounded bg-white p-2">
+        <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
+        <div
+          class="border bg-gray-50 p-2 overflow-auto"
+          style="min-height:90px; max-height:800px; max-width:100%; width:fit-content; height:fit-content; display:block;"
+        >
+          {@html renderSnapshot(snapshot)}
+        </div>
       </div>
-    {/if}
-    {#if sendResult}
-      <div class="text-xs text-green-700 mb-2">{sendResult}</div>
-    {/if}
-    {#if sendError}
-      <div class="text-xs text-red-600 mb-2">{sendError}</div>
-    {/if}
-    <div class="mb-4 w-full border rounded bg-white p-2">
-      <h2 class="font-semibold text-sm mb-2">Live Preview</h2>
       <div
-        class="border bg-gray-50 p-2 overflow-auto"
-        style="min-height:90px; max-height:800px; max-width:100%; width:fit-content; height:fit-content; display:block;"
+        class="overflow-auto w-full max-h-72 bg-white rounded border p-2 text-xs"
       >
-        {@html renderSnapshot(snapshot)}
+        <pre>{JSON.stringify(snapshot, null, 2)}</pre>
       </div>
-    </div>
-    <div class="overflow-auto w-full max-h-72 bg-white rounded border p-2 text-xs">
-      <pre>{JSON.stringify(snapshot, null, 2)}</pre>
-    </div>
-  {:else}
-    <div class="text-gray-500">No element selected yet. Use the selector on any page.</div>
-  {/if}
+    {:else}
+      <div class="text-gray-500">
+        No element selected yet. Use the selector on any page.
+      </div>
+    {/if}
+  </div>
+  <!-- Right column: LLM streaming result -->
+  <div class="flex flex-col flex-1 w-1/2">
+    {#if streamingResult}
+      <div
+        class="text-xs text-gray-800 whitespace-pre-wrap mb-2 border rounded bg-gray-50 p-2 max-h-[80vh] overflow-auto"
+      >
+        {@html marked(streamingResult)}
+      </div>
+    {/if}
+  </div>
 </main>
